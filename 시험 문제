@@ -54,8 +54,8 @@
 
 9. 실습 종료 후, 계정 초기화
 
-	- git config --global --upset user.name > 사용자 이름 삭제
-	- git config --global --upset user.email > 사용자 이메일 삭제
+	- git config --global --unset user.name > 사용자 이름 삭제
+	- git config --global --unset user.email > 사용자 이메일 삭제
 	- git config --global --list > 로 계정 삭제 확인 가능
 
 10. Branch란?
@@ -236,16 +236,71 @@
 
 35. 병렬 쿼리
 
-	- 
+	온프레미스에서 Full Scan에 많은 시간이 걸림 > AWS Aurora로 바꿈	
+
+	- AWS Aurora : 스토리지에 분산 저장된 세그먼트를 스토리지 노트에서 직접 병렬 스캔
+		- 빠름 > 병렬적 분산 스캔
+		- 부하 분산 > 메모리, CPU를 쓰지 않고 스토리지 노드가 작업을 대신 수행
+		- OLAP최적화 : 분석성 쿼리에 적합
+		- Aurora MySQL 전용
+		- 낮은 인스턴스 타입에서는 미지원(t2,t3)
+		- 트랜잭션성 OLTP쿼리에는 장점 없음
 
 36. Binlog
 
-37. AWS Aurora 백업 방법
+	- 데이터 변경을 Binlog에 기록 > INSERT이벤트등이 Binlog에 기록됨
+	- Binlog는 SQL문 그대로 저장하지 않고 압축된 이진 포맷으로 기록
+	- Replica DB는 Binlog를 읽고 해당 이벤트를 재실행하여 Primary와 동기화
 
-38. Copy-on-Write 방식
+	- 데이터변경 Binlog에 이진포멧으로 압축기록 > Replica DB가 Binlog읽고 변경을 재실행하여 Primary와 동기화
 
+	- 이유
+		- 온프레미스는 스토리지 별도 구성, 스토리지 통제 복제는 무거움, Binlog는 가볍고 이식 유연성 좋음
 
+37. Aurora 백업
 
+	- 스토리지 기반 백업 : Aurora는 Binlog 대신 스토리지 레벨에서 자동 백업, 변경된 데이터 블록 S3에 저장, 시점복구 지원
+	- 자동 백업 : 기본 제공, 보관기간 1~35일, S3에 저장 > 내구성 99.999%
+	- 수동 백업(Snapshot) : 사용자가 특정 시점에 스냅샷 생성, 장기 보관 가능, 다른 리전으로 복사 가능
+	- 리전 간 백업 : 스토리지는 리전 단위 리소스 > 다른 리전과 직접 공유 불가
+		- Binlog기반 Read Replica > MySQL전용, 느림
+		- Aurora Global DataBase > Aurora 전용, 빠르고 효율적
+
+38. Aurora Cloning
+		
+	- 오리지널 클러스터 두고 클론 클러스터 생성 하지만 데이터 전체 복사 X, 대신 기존 스토리지 데이터 공유
+	- Copy-on-Write : 클론은 원본과 같은 스토리지 바라봄, 새로운 데이터 변경이 필요기 변경된 블록만 새로운 스토리지 복사 후 기록
+		- 공유가 가능한 블록 그대로 사용하고 수정된 블록은 분리 저장함
+	- 장점 
+		- 속도 : 수 테라급 DB도 몇분만에 복제 가능(전체 카피 X)
+		- 비용 절감 : 변경된 블록만 추가 저장 (전체 카피대비 저렴)
+		- 유연성 : 원본 클러스터 지워도 클론 독립동작
+
+39. Aurora Backtrack
+	
+	- 기존 DB를 특정 시점으로 되돌리는 기능
+	- 새로운 DB생성하지 않고 기본 DB를 롤백
+	- MySQL 오픈소스에 없는 기능
+	- 스냅샷 복구보다 빠르고 간편
+	- PostgreSQL 버전은 지원하지 않음
+
+40. Multi-Master
+
+	- 모든 인스턴스가 Writer/Reader 역할 수행 가능 (Writer노드는 최대 4개 지원) (무중단 고가용성 + 쓰기 확장성 확보)
+	- 각 Writer 노드 독립적 > 정지, 재부팅, 삭제가 다른 노드에 영향 없음 > Writer 장애시 Failover 필요 없음 > 다른 Wirter가 즉시 처리
+	- 지속적인 가용성 제공을 목표함
+
+41. Sharding
+
+	- 큰 데이터 베이스를 작은단위로 나눠 여러 DB서버에 분산 저장하는 방식
+	- 300만이라면 Shard A에 0~100만 Shard B에 100만 ~ 200만 Shard C에 200만 ~ 300만으로
+	- 특정 Shard에 부하 집중이 Hotspot(트래픽 집중 현상) 발생 단점있음
+
+42. Endpoint가 세개인 이유
+
+	- Aurora는 인스턴스가 아닌 클러스터 중심 구조로 동작
+	- Aurora는 인스턴스 하나만 만들어도 자동으로 클러스터 구조 생성
+	- 하나의 인스턴스만 있어도 Aurora는 세 가지 주소를 자동으로 만듬
 
 
 
